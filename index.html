@@ -4,6 +4,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Drum Tutor</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#12141a">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Drum Tutor">
+
 <style>
 :root{--bg:#12141a;--panel:#1b1f29;--line:#2b3140;--text:#e7eaf0;--dim:#8d96a8;--accent:#4cc9f0}
 *{box-sizing:border-box}
@@ -1719,5 +1726,6 @@ window.addEventListener('keydown', e => {
 $('padsnd').onchange = e => { e.target.blur(); save(); };
 renderChips(); resize(); initMidi(); requestAnimationFrame(frame);
 </script>
+<script>if('serviceWorker' in navigator && location.protocol.startsWith('http')) window.addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));</script>
 </body>
 </html>
