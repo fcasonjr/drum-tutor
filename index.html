@@ -41,6 +41,12 @@ aside{flex:0 0 240px;display:flex;flex-direction:column;gap:12px}
 #mapping{padding:0 16px 20px}
 #mapping h2{font-size:15px;margin:6px 0 8px}
 .chips{display:flex;flex-wrap:wrap;gap:8px}
+.lanebar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:8px 16px;background:#161922;border-bottom:1px solid var(--line);font-size:14px;color:var(--dim)}
+.lanebar.locked .lchip{opacity:.55;cursor:default}
+.lchip{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:99px;font-size:13px;user-select:none;-webkit-user-select:none;touch-action:manipulation}
+.lchip .dot{width:9px;height:9px;border-radius:50%;display:inline-block}
+.lchip.off{opacity:.4;text-decoration:line-through;background:transparent}
+.lanebar.locked .lchip.off{opacity:.25}
 .chip{display:flex;align-items:center;gap:8px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:6px 10px;font-size:13px}
 .chip.learning{border-color:#ffd166;color:#ffd166}
 .dot{width:10px;height:10px;border-radius:50%}
@@ -113,6 +119,12 @@ button:disabled{opacity:.45;cursor:default}
   <button id="calib">Calibrate</button>
   <button id="pause" hidden title="Freeze the song so you can pick bars to loop (shortcut: P)">Pause</button>
   <button id="go" class="primary">Start</button>
+</div>
+<div class="lanebar" id="lanebar">
+  <span>Practice drums</span><span id="laneChips" style="display:flex;gap:6px;flex-wrap:wrap"></span>
+  <select id="lanePreset" aria-label="Drum presets"><option value="">Presets…</option><option value="all">All drums</option><option value="ks">Kick + snare</option><option value="kh">Kick + hi-hat</option><option value="hands">Hands only (no kick)</option><option value="cym">Cymbals only</option></select>
+  <label style="display:flex;align-items:center;gap:6px" title="Keep playing the hidden drums' sound from the pattern so you hear the full groove (not in Wait for me mode)"><input type="checkbox" id="hearHidden"> Still hear hidden drums</label>
+  <span class="small" id="laneHint">Click a drum to hide it · Shift-click or hold to play just that one</span>
 </div>
 <div id="msg">Hit any pad (or use the keyboard) to test. Press Start or Space to begin.</div>
 
@@ -255,7 +267,7 @@ let offset = 0;               // ms, subtracted from hit times
 let ctxA = null, noiseBuf = null;
 let running = false, startMs = 0, beatMs = 750, cycleBeats = 4;
 let pat = PATTERNS[0], notes = [], back = [], genCycles = 0, nextClickBeat = 0;
-let cycEvents = [], cycBack = [], barInt = 4, backOn = true;
+let cycGhost = [], cycEvents = [], cycBack = [], barInt = 4, backOn = true;
 let loopOn = true, demoOn = false, metOn = true, countIn = 4;
 let schedTimer = null, learnLane = null, calib = null;
 let stats = freshStats();
@@ -267,7 +279,10 @@ function freshStats(){ return {perfect:0,good:0,okay:0,miss:0,extra:0,combo:0,be
 let frozen = null, waitOn = false, waitLanes = new Set();
 let paused = null, pausedRange = '', jumpToBar = -1;      // paused = {at, bar} while the run is on hold
 function clockNow(){ return frozen ? frozen.at : paused ? paused.at : performance.now(); }
-function rangeStr(){ return $('barFrom').value+'|'+$('barTo').value; }
+function hearHidden(){ return $('hearHidden').checked; }
+const laneOff = new Set();                                  // drums hidden from practice
+function laneSig(){ return LANES.filter(l => laneOff.has(l.id)).map(l => l.id).join(','); }
+function rangeStr(){ return $('barFrom').value+'|'+$('barTo').value+'|'+laneSig(); }
 function applyFlags(){
   loopOn = $('loop').checked;
   demoOn = $('demo').checked && !waitOn; metOn = $('metro').checked && !waitOn; backOn = $('backing').checked && !waitOn;
@@ -617,12 +632,13 @@ function ensureNotes(toBeat){
   while(genCycles*cycleBeats < toBeat && (loopOn || genCycles<1)){
     const base = genCycles*cycleBeats;
     for(const e of cycEvents) notes.push({beat:base+e.beat, lane:e.lane, vel:e.vel, open:e.open, state:0, sched:false});
+    for(const g of cycGhost) back.push({beat:base+g.beat, drum:true, lane:g.lane, open:g.open, vel:g.vel, sched:false});
     for(const b of cycBack) back.push({beat:base+b.beat, dur:b.dur, note:b.note, vel:b.vel, prog:b.prog, sched:false});
     genCycles++;
   }
 }
 function setMsg(t){ $('msg').textContent = t; }
-function setLocked(b){ ['pattern','bpm','calib','imp','rmsong','barFrom','barTo','wait'].forEach(id => $(id).disabled = b); }
+function setLocked(b){ ['pattern','bpm','calib','imp','rmsong','barFrom','barTo','wait'].forEach(id => $(id).disabled = b);  renderLaneChips(); }
 
 function start(){
   if(calib) return;
@@ -631,7 +647,7 @@ function start(){
   const cyc = buildCycle(); curCycle = cyc; pat = cyc.p;
   beatMs = 60000/ +$('bpm').value;
   barInt = Number.isInteger(cyc.barBeats) ? cyc.barBeats : 4;
-  cycleBeats = cyc.cycleBeats; cycEvents = cyc.events; cycBack = cyc.back; userPage = 0;
+  cycleBeats = cyc.cycleBeats; cycEvents = cyc.events; cycBack = cyc.back; cycGhost = cyc.ghost||[]; userPage = 0;
   paused = null; waitOn = $('wait').checked; frozen = null; waitLanes = new Set(); applyFlags(); runStartReal = performance.now();
   countIn = $('countin').checked ? 4 : 0;
   notes = []; back = []; genCycles = 0; stats = freshStats(); popups.length = 0; fx.length = 0;
@@ -667,8 +683,9 @@ function pauseRun(){
   paused = {at: performance.now(), bar}; jumpToBar = bar; pausedRange = rangeStr(); barPending = null;
   $('barFrom').disabled = false; $('barTo').disabled = false;
   $('pause').textContent = 'Resume';
+  renderLaneChips();
   if(viewMode!=='notation'){ viewMode = 'notation'; applyView(); }
-  setMsg('Paused. Click a bar (or drag across several) to choose the section to loop, then press Resume. If you change the bars, the new section starts from its first bar.');
+  setMsg('Paused. Click a bar (or drag across several) to choose the section to loop, or change the practice drums, then press Resume. If you change either, the new section starts from its first bar.');
 }
 function resumeRun(){
   if(!paused) return;
@@ -696,7 +713,8 @@ function schedule(){
   for(const n of back){
     if(!n.sched && n.beat <= aheadBeat){
       n.sched = true;
-      if(backOn) playBacking(n, beatToAudio(n.beat), n.dur*beatMs/1000);
+      if(n.drum){ if(hearHidden() && !waitOn) playDrum(n.open?'hihatO':n.lane, beatToAudio(n.beat), velGain(n.vel||100)); }
+      else if(backOn) playBacking(n, beatToAudio(n.beat), n.dur*beatMs/1000);
     }
   }
 }
@@ -716,6 +734,7 @@ function processHit(lane, vel, ts, open){
   if(seqRec) seqRecordHit(lane, ts, open);
   if(calib){ calibHit(ts); return; }
   if(!running || paused) return;
+  if(laneOff.has(lane)) return;                     // hidden drum: sounds, but is not scored
   const hb = frozen ? frozen.beat : ((ts-offset)-startMs)/beatMs;
   if(hb < -0.6) return;
   let best=null, bestD=1e9;
@@ -849,6 +868,50 @@ const NPOS = {kick:1, snare:5, tom1:7, tom2:6, tom3:3, hihat:9, ride:8, crash:10
 const XHEAD = {hihat:1, ride:1, crash:1};
 const GRADE_COL = {1:'#4ade80', 2:'#bef264', 3:'#fbbf24', 4:'#f87171', 5:'#ffd166'};
 const INK = '#e7eaf0', STAFF = '#5b6478', DIM = '#8d96a8', STEM = '#cdd3df';
+function lanesLocked(){ return running && !paused; }
+function renderLaneChips(){
+  const box = $('laneChips'); box.innerHTML = '';
+  $('lanebar').classList.toggle('locked', lanesLocked());
+  for(const l of LANES){
+    const b = document.createElement('button'); b.className = 'lchip'+(laneOff.has(l.id)?' off':''); b.type = 'button';
+    b.setAttribute('aria-pressed', laneOff.has(l.id) ? 'false' : 'true'); b.title = laneOff.has(l.id) ? 'Hidden. Click to show' : 'Click to hide. Shift-click or hold to play just this drum';
+    const dot = document.createElement('span'); dot.className = 'dot'; dot.style.background = l.color;
+    b.append(dot, document.createTextNode(l.label));
+    let timer = null, held = false;
+    b.onpointerdown = () => { held = false; timer = setTimeout(() => { held = true; soloLane(l.id); }, 500); };
+    const cancel = () => { clearTimeout(timer); };
+    b.onpointerup = cancel; b.onpointerleave = cancel; b.onpointercancel = cancel;
+    b.onclick = e => { b.blur(); if(held){ held = false; return; } if(e.shiftKey) soloLane(l.id); else toggleLane(l.id); };
+    box.append(b);
+  }
+}
+function laneChanged(){
+  prevCache = null; renderLaneChips(); refreshBest();
+  const hidden = laneOff.size;
+  setMsg(hidden ? 'Practicing '+LANES.filter(l=>!laneOff.has(l.id)).map(l=>l.label).join(' + ')+'. Hidden drums are not shown or scored.'+(paused ? ' Press Resume to restart with this selection.' : '') : 'Practicing all drums.');
+}
+function toggleLane(id){
+  if(lanesLocked()){ setMsg('Pause first to change which drums you practice.'); return; }
+  if(laneOff.has(id)) laneOff.delete(id);
+  else { if(LANES.filter(l => !laneOff.has(l.id)).length<=1){ setMsg('Keep at least one drum on.'); return; } laneOff.add(id); }
+  laneChanged();
+}
+function soloLane(id){
+  if(lanesLocked()){ setMsg('Pause first to change which drums you practice.'); return; }
+  const only = LANES.every(l => l.id===id ? !laneOff.has(id) : laneOff.has(l.id));
+  laneOff.clear();
+  if(!only) LANES.forEach(l => { if(l.id!==id) laneOff.add(l.id); });
+  laneChanged();
+}
+const LANE_PRESETS = {all:null, ks:['kick','snare'], kh:['kick','hihat'], hands:['crash','ride','hihat','tom1','snare','tom2','tom3'], cym:['crash','ride','hihat']};
+$('lanePreset').onchange = e => {
+  const k = e.target.value; e.target.value = ''; e.target.blur();
+  if(!k) return;
+  if(lanesLocked()){ setMsg('Pause first to change which drums you practice.'); return; }
+  const keep = LANE_PRESETS[k]; laneOff.clear();
+  if(keep) LANES.forEach(l => { if(keep.indexOf(l.id)<0) laneOff.add(l.id); });
+  laneChanged();
+};
 const barHits = []; let barPending = null, barDrag = false;
 function nBarsOf(dc){ return Math.max(1, Math.round(dc.cycleBeats/dc.barBeats)); }
 let viewMode = 'game', userPage = 0, curCycle = null, prevCache = null, lastDcKey = '', lastPageLbl = '';
@@ -861,22 +924,24 @@ function buildCycle(){
   from = Math.min(from, src.bars); if(to<from) to = from;
   const r0 = (from-1)*src.barBeats, cb = (to-from+1)*src.barBeats;
   return {
-    p, src, firstBar:from, barBeats:src.barBeats, cycleBeats:cb,
-    events: src.events.filter(e => e.beat>=r0-1e-6 && e.beat<r0+cb-1e-6).map(e => ({beat:e.beat-r0, lane:e.lane, vel:e.vel, open:!!e.open})),
+    p, src, firstBar:from, barBeats:src.barBeats, cycleBeats:cb, drumsOff: laneSig(),
+    events: src.events.filter(e => e.beat>=r0-1e-6 && e.beat<r0+cb-1e-6 && !laneOff.has(e.lane)).map(e => ({beat:e.beat-r0, lane:e.lane, vel:e.vel, open:!!e.open})),
+    ghost: src.events.filter(e => e.beat>=r0-1e-6 && e.beat<r0+cb-1e-6 && laneOff.has(e.lane)).map(e => ({beat:e.beat-r0, lane:e.lane, vel:e.vel, open:!!e.open})),
     back: src.backing.filter(b => b.beat>=r0-1e-6 && b.beat<r0+cb-1e-6).map(b => ({beat:b.beat-r0, dur:Math.min(b.dur, r0+cb-b.beat), note:b.note, vel:b.vel, prog:b.prog}))
   };
 }
 let fullCache = null;
 function fullCycle(){
   const p = PATTERNS[+$('pattern').value], src = sourceOf(p);
-  if(!fullCache || fullCache.src!==src){
-    fullCache = {key:'full|'+$('pattern').value+'|'+PATTERNS.length, p, src, firstBar:1, barBeats:src.barBeats, cycleBeats:src.bars*src.barBeats,
-      events: src.events.map(e => ({beat:e.beat, lane:e.lane, vel:e.vel, open:!!e.open})), back:[]};
+  const sig = laneSig();
+  if(!fullCache || fullCache.src!==src || fullCache.sig!==sig){
+    fullCache = {key:'full|'+$('pattern').value+'|'+PATTERNS.length, sig, p, src, firstBar:1, barBeats:src.barBeats, cycleBeats:src.bars*src.barBeats,
+      events: src.events.filter(e => !laneOff.has(e.lane)).map(e => ({beat:e.beat, lane:e.lane, vel:e.vel, open:!!e.open})), back:[]};
   }
   return fullCache;
 }
 function previewCycle(){
-  const key = $('pattern').value+'|'+$('barFrom').value+'|'+$('barTo').value+'|'+PATTERNS.length;
+  const key = $('pattern').value+'|'+$('barFrom').value+'|'+$('barTo').value+'|'+PATTERNS.length+'|'+laneSig();
   if(!prevCache || prevCache.key!==key){ prevCache = buildCycle(); prevCache.key = key; }
   return prevCache;
 }
@@ -1149,7 +1214,7 @@ function draw(now, curBeat){
   const W=cw, H=ch, mx=8, lw=(W-mx*2)/LANES.length, hitY=H-130, topY=10;
   const yOf = b => hitY - (b-curBeat)/LOOK*(hitY-topY);
   g2.clearRect(0,0,W,H);
-  LANES.forEach((l,i)=>{ g2.fillStyle = i%2?'#141821':'#171b25'; g2.fillRect(mx+i*lw,0,lw,H); });
+  LANES.forEach((l,i)=>{ g2.fillStyle = i%2?'#141821':'#171b25'; g2.fillRect(mx+i*lw,0,lw,H); if(laneOff.has(l.id)){ g2.fillStyle = 'rgba(8,9,13,0.6)'; g2.fillRect(mx+i*lw,0,lw,H); } });
 
   if(running){
     for(let k=Math.floor(curBeat)-1; k<=curBeat+LOOK+1; k++){
@@ -1246,10 +1311,10 @@ function loadHistory(){ try{ const h = JSON.parse(localStorage.getItem(HKEY)||'[
 function saveHistory(){ try{ localStorage.setItem(HKEY, JSON.stringify(runLog.slice(-500))); }catch(e){} }
 let runLog = loadHistory(), runStartReal = 0, pchartSong = '';
 
-function keyOf(r){ return r.song+'|'+r.from+'|'+r.to; }
+function keyOf(r){ return r.song+'|'+r.from+'|'+r.to+'|'+(r.drums||''); }
 function currentKey(){
   const c = previewCycle(), n = Math.max(1, Math.round(c.cycleBeats/c.barBeats));
-  return {song:PATTERNS[+$('pattern').value].name, from:c.firstBar, to:c.firstBar+n-1};
+  return {song:PATTERNS[+$('pattern').value].name, from:c.firstBar, to:c.firstBar+n-1, drums:laneSig()};
 }
 function recordRun(finished){
   const graded = stats.perfect+stats.good+stats.okay+stats.miss;
@@ -1259,26 +1324,31 @@ function recordRun(finished){
     t:Date.now(), song:pat.name, from:c.firstBar, to:c.firstBar+Math.max(1,Math.round(c.cycleBeats/c.barBeats))-1,
     bpm:+$('bpm').value, mode:waitOn?'wait':'play', acc:Math.round(acc*10)/10,
     perfect:stats.perfect, good:stats.good, okay:stats.okay, miss:stats.miss, extra:stats.extra, combo:stats.best,
-    off:stats.offN ? Math.round(stats.offSum/stats.offN) : 0, secs:Math.round((performance.now()-runStartReal)/1000), done:!!finished
+    drums:c.drumsOff||'', off:stats.offN ? Math.round(stats.offSum/stats.offN) : 0, secs:Math.round((performance.now()-runStartReal)/1000), done:!!finished
   };
   const prev = runLog.filter(r => r.mode==='play' && keyOf(r)===keyOf(run)).reduce((m,r) => Math.max(m,r.acc), -1);
   runLog.push(run); saveHistory();
   return {run, newBest: run.mode==='play' && prev>=0 && run.acc>prev, first: run.mode==='play' && prev<0};
 }
-function barsLabel(r){ return r.from===r.to ? 'bar '+r.from : 'bars '+r.from+'–'+r.to; }
+function drumsLabel(r){
+  if(!r.drums) return '';
+  const off = r.drums.split(','), kept = LANES.filter(l => off.indexOf(l.id)<0).map(l => l.label);
+  return ' · ' + (kept.length<=3 ? kept.join(' + ') : 'without '+LANES.filter(l => off.indexOf(l.id)>=0).map(l => l.label).join(', '));
+}
+function barsLabel(r){ return (r.from===r.to ? 'bar '+r.from : 'bars '+r.from+'–'+r.to) + drumsLabel(r); }
 function fmtDate(t){ const d = new Date(t); return d.toLocaleDateString(undefined,{month:'short',day:'numeric'})+' '+d.toLocaleTimeString(undefined,{hour:'numeric',minute:'2-digit'}); }
 function fmtSecs(s){ const m = Math.floor(s/60); return m>=60 ? Math.floor(m/60)+' h '+(m%60)+' min' : m+' min'; }
 function offLabel(ms){ return Math.abs(ms)<4 ? 'on time' : Math.abs(ms)+' ms '+(ms<0?'early':'late'); }
 
 function refreshBest(){
-  const k = currentKey(), mine = runLog.filter(r => keyOf(r)===(k.song+'|'+k.from+'|'+k.to));
+  const k = currentKey(), mine = runLog.filter(r => keyOf(r)===keyOf(k));
   const play = mine.filter(r => r.mode==='play');
   $('bRuns').textContent = mine.length;
   $('bBest').textContent = play.length ? Math.round(Math.max.apply(null, play.map(r=>r.acc)))+'%' : '–';
   $('bLast').textContent = play.length ? Math.round(play[play.length-1].acc)+'%' : '–';
   const clean = play.filter(r => r.acc>=90);
   $('bTempo').textContent = clean.length ? Math.max.apply(null, clean.map(r=>r.bpm))+' BPM' : '–';
-  $('bestLbl').textContent = k.song+' · '+(k.from===k.to ? 'bar '+k.from : 'bars '+k.from+'–'+k.to);
+  $('bestLbl').textContent = k.song+' · '+barsLabel(k);
 }
 
 function renderProgress(){
@@ -1362,8 +1432,8 @@ function drawChart(runs){
 
 function exportCsv(){
   const q = v => '"'+String(v).replace(/"/g,'""')+'"';
-  const rows = [['date','song','from_bar','to_bar','bpm','mode','accuracy','perfect','good','okay','missed','extra','best_combo','avg_offset_ms','seconds']];
-  runLog.forEach(r => rows.push([new Date(r.t).toISOString(), r.song, r.from, r.to, r.bpm, r.mode, r.acc, r.perfect, r.good, r.okay, r.miss, r.extra, r.combo, r.off, r.secs]));
+  const rows = [['date','song','from_bar','to_bar','bpm','mode','accuracy','perfect','good','okay','missed','extra','best_combo','avg_offset_ms','seconds','drums_hidden']];
+  runLog.forEach(r => rows.push([new Date(r.t).toISOString(), r.song, r.from, r.to, r.bpm, r.mode, r.acc, r.perfect, r.good, r.okay, r.miss, r.extra, r.combo, r.off, r.secs, r.drums||'']));
   const blob = new Blob([rows.map(r=>r.map(q).join(',')).join('\n')], {type:'text/csv'});
   const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'drum-tutor-progress.csv';
   document.body.append(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(a.href), 1000);
@@ -1802,7 +1872,7 @@ window.addEventListener('keydown', e => {
 });
 ['pointerdown','keydown'].forEach(ev => window.addEventListener(ev, () => { try{ initAudio(); }catch(e){} }, {passive:true}));
 $('padsnd').onchange = e => { e.target.blur(); save(); };
-renderChips(); resize(); initMidi(); requestAnimationFrame(frame);
+renderLaneChips(); renderChips(); resize(); initMidi(); requestAnimationFrame(frame);
 </script>
 <script>if('serviceWorker' in navigator && location.protocol.startsWith('http')) window.addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));</script>
 </body>

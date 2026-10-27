@@ -101,7 +101,31 @@ to notation view and outlines the bar you were in.
 
 Pad hits do not count while paused.
 
-## 4. Importing songs
+## 4. Practicing some drums at a time
+
+The **Practice drums** row above the stage lets you hide drums so you can work
+on one or two at a time.
+
+- **Click a drum** to hide it. Hidden drums disappear from the falling blocks
+  and the notation, and they are not scored. Hitting a hidden drum's pad is not
+  counted as an extra hit.
+- **Shift-click** a drum (or press and hold it on a touch screen) to play only
+  that drum. Do it again on the same drum to bring everything back.
+- **Presets** gives quick choices: All drums, Kick + snare, Kick + hi-hat, Hands
+  only (no kick) and Cymbals only.
+- **Still hear hidden drums** keeps playing the hidden drums' sound from the
+  pattern, so you hear the whole groove while you practice your part. It is
+  not used in Wait for me mode.
+
+You can change the drums while stopped or paused. If you change them while
+paused, Resume starts again from the first bar. At least one drum always stays
+on.
+
+Progress is kept separately for each set of drums. A kick-only run of a song
+does not mix with your full-kit scores for it. The Progress table and the
+CSV export show which drums were hidden.
+
+## 5. Importing songs
 
 Press **Import MIDI…**, or drag a `.mid` file onto the page. The app finds the
 drum part (General MIDI channel 10) and shows it as a pattern. Other
@@ -115,7 +139,7 @@ Notes:
   you how many.
 - Open hi-hat is read from General MIDI note 46.
 
-## 5. Sequencer
+## 6. Sequencer
 
 Press **Sequencer** to build your own practice patterns.
 
@@ -132,7 +156,7 @@ Press **Sequencer** to build your own practice patterns.
   and takes you straight to practicing it.
 - **Export MIDI** downloads the pattern as a `.mid` file.
 
-## 6. Mixer
+## 7. Mixer
 
 Press **Mixer** to set each drum's volume and, for cymbals, how long they ring.
 Volume 0% mutes a drum. **Test** plays a drum with its current settings.
@@ -142,7 +166,7 @@ and the Classic ride. **Reset to defaults** restores everything.
 
 The mixer affects the sounds this app makes, not your kit's own sounds.
 
-## 7. Progress
+## 8. Progress
 
 Press **Progress** to see your history. A run is saved when it finishes, or when
 you stop it after at least 8 scored notes.
@@ -153,21 +177,21 @@ you stop it after at least 8 scored notes.
 - The chart shows how your accuracy changes over time.
 - **Export CSV** downloads your history, and **Clear history** removes it.
 
-## 8. Installing and offline use
+## 9. Installing and offline use
 
 On a computer or Android, use the browser's **Install app** or **Add to Home
 screen** option (on desktop, the install icon in the address bar). After the
 first visit the app opens without a connection. When you are online, it checks
 for a newer version each time it loads.
 
-## 9. Where your data lives
+## 10. Where your data lives
 
 Settings, mixer choices, imported songs, your own patterns and your progress
 history are stored in the browser on each device. They do not sync between
 devices and are not sent anywhere. Clearing the browser's site data erases them,
 so use **Export CSV** and **Export MIDI** for anything you want to keep.
 
-## 10. Troubleshooting
+## 11. Troubleshooting
 
 | Problem | What to try |
 | --- | --- |

@@ -14,6 +14,7 @@ Roland V-Drums Lite HD-3.
 - Notation view
 - "Wait for me" mode, where the song pauses until you play the right note
 - Loop any bars: click or drag bars in the notation view, and pause to change them
+- Hide or solo individual drums to practice one or two at a time
 - Import MIDI songs, with an optional backing track
 - Step sequencer to build your own practice patterns, with MIDI export
 - Record your own playing into the sequencer
