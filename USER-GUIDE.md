@@ -96,7 +96,8 @@ to notation view and outlines the bar you were in.
 
 - **Resume** with the bars unchanged carries on where you left off.
 - **Resume** after choosing different bars starts the new section from its first
-  bar. The run you were on is saved first.
+  bar. The run you were on is saved first. Changing the practice drums does
+  not restart the song.
 - **Stop** ends the run, and the next Start begins at the beginning.
 
 Pad hits do not count while paused.
@@ -117,13 +118,24 @@ on one or two at a time.
   pattern, so you hear the whole groove while you practice your part. It is
   not used in Wait for me mode.
 
-You can change the drums while stopped or paused. If you change them while
-paused, Resume starts again from the first bar. At least one drum always stays
-on.
+**Changing drums mid-song.** You can change the drums at any time, even while
+the song is playing, and it carries on without restarting. The change applies
+to the notes still coming up. On a keyboard, use the number keys so you don't
+have to reach for the mouse:
+
+| Key | Action |
+| --- | --- |
+| 1 to 8 | Hide or show a drum, in the order shown: 1 Crash, 2 Ride, 3 Hi-Hat, 4 Tom 1, 5 Snare, 6 Tom 2, 7 Tom 3, 8 Kick |
+| Shift + 1 to 8 | Play only that drum |
+| 0 | Show all drums |
+
+At least one drum always stays on. In Wait for me mode, if you hide the drum
+the song was waiting for, it carries on to the next note.
 
 Progress is kept separately for each set of drums. A kick-only run of a song
-does not mix with your full-kit scores for it. The Progress table and the
-CSV export show which drums were hidden.
+does not mix with your full-kit scores for it. A run where you changed drums
+part-way through is filed as "drums changed mid-run". The Progress table and
+the CSV export show which drums were hidden.
 
 ## 5. Importing songs
 

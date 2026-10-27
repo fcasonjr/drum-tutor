@@ -41,6 +41,16 @@ aside{flex:0 0 240px;display:flex;flex-direction:column;gap:12px}
 #mapping{padding:0 16px 20px}
 #mapping h2{font-size:15px;margin:6px 0 8px}
 .chips{display:flex;flex-wrap:wrap;gap:8px}
+.helpmenu{position:fixed;top:58px;right:12px;width:min(540px,calc(100vw - 24px));max-height:calc(100vh - 76px);overflow:auto;background:var(--panel);border:1px solid var(--line);border-radius:12px;box-shadow:0 12px 40px rgba(0,0,0,.55);padding:6px 14px 12px;z-index:50}
+.helpmenu[hidden]{display:none}
+.helpmenu h2{font-size:15px;margin:10px 0 2px}
+.helpmenu details{border-bottom:1px solid #232938;padding:2px 0}
+.helpmenu summary{cursor:pointer;padding:9px 2px;font-weight:600;font-size:14px}
+.helpmenu details[open] summary{color:var(--accent)}
+.helpmenu .hb{padding:0 2px 10px;font-size:13.5px;line-height:1.5;color:#c9cfdb}
+.helpmenu .hb p{margin:0 0 6px}
+.helpmenu .hb ul{margin:0 0 6px;padding-left:18px}
+.helpmenu kbd{background:#262c3a;border:1px solid var(--line);border-radius:4px;padding:0 5px;font-size:12px}
 .lanebar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:8px 16px;background:#161922;border-bottom:1px solid var(--line);font-size:14px;color:var(--dim)}
 .lanebar.locked .lchip{opacity:.55;cursor:default}
 .lchip{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:99px;font-size:13px;user-select:none;-webkit-user-select:none;touch-action:manipulation}
@@ -99,7 +109,34 @@ button:disabled{opacity:.45;cursor:default}
   <button id="mbtn">🎚 Mixer</button>
   <button id="sbtn">🎛 Sequencer</button>
   <button id="pbtn">📈 Progress</button>
+  <button id="hbtn" aria-haspopup="true" aria-expanded="false">❓ Help ▾</button>
 </header>
+<div class="helpmenu" id="helpmenu" hidden role="dialog" aria-label="Help">
+  <h2>Help</h2>
+  <details open><summary>Getting started</summary><div class="hb">
+    <p>Plug your kit in by USB (or a USB-to-MIDI adapter) and allow MIDI when the browser asks. Hit a pad: it should light up on screen and "Last note" shows its number.</p>
+    <ul><li>Chrome or Edge on computers and Android. On iPhone and iPad use MIDIWeb Browser.</li><li>Pick a <b>Pattern</b>, set the <b>Tempo</b>, press <b>Start</b> (or <kbd>Space</kbd>). After the 4-beat count-in, hit each pad as its block reaches the line.</li><li>No kit? Keys <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd> <kbd>F</kbd> <kbd>J</kbd> <kbd>K</kbd> <kbd>L</kbd> <kbd>;</kbd> play crash, ride, hi-hat, tom 1, snare, tom 2, tom 3, kick. <kbd>G</kbd> is open hi-hat.</li></ul></div></details>
+  <details><summary>Scoring and timing</summary><div class="hb">
+    <p>Hits are graded Perfect (within 35 ms), Good (70 ms) or OK (120 ms). Accuracy, combo and average timing show beside the stage.</p>
+    <ul><li>If you always hit early or late, press <b>Calibrate</b> and tap on each click after the first four, or type a value into <b>Latency offset</b>.</li><li><b>Wait for me</b> freezes the song at each note until you hit it, so you can learn at your own pace.</li></ul></div></details>
+  <details><summary>Loop bars and Pause</summary><div class="hb">
+    <ul><li>Type bars into <b>Bars … to …</b>, or pick them in Notation view: click the first bar then the last, or drag across several. <b>All</b> clears the range. <b>Loop</b> repeats the section.</li><li><b>Pause</b> (or <kbd>P</kbd>) freezes the song and shows the whole song so you can pick new bars. <b>Resume</b> continues where you were. If you changed the bars, it restarts from the first bar.</li><li><b>Stop</b> ends the run. The next Start begins at the beginning.</li></ul></div></details>
+  <details><summary>Practice some drums at a time</summary><div class="hb">
+    <ul><li>In <b>Practice drums</b>, click a drum to hide it. Hidden drums are not shown or scored.</li><li>Shift-click, or press and hold, to play only that drum. Do it again to bring everything back.</li><li><b>Presets</b> has quick sets such as Kick + snare. <b>Still hear hidden drums</b> keeps their sound playing.</li><li>You can change drums any time, even mid-song, and the song carries on without restarting. Keys <kbd>1</kbd>–<kbd>8</kbd> hide or show a drum (in the order shown), <kbd>Shift</kbd>+<kbd>1</kbd>–<kbd>8</kbd> solo it and <kbd>0</kbd> shows all.</li><li>Progress is kept separately for each set of drums. A run where you changed drums part-way is marked as mixed.</li></ul></div></details>
+  <details><summary>Importing songs</summary><div class="hb">
+    <p>Press <b>Import MIDI…</b> or drag a .mid file onto the page. The drum part becomes a pattern and other instruments become the backing track. Imported songs are remembered on this device. <b>Remove song</b> deletes the selected one.</p>
+    <p>Tempo changes inside a file are not followed, and drum notes with no matching pad are skipped.</p></div></details>
+  <details><summary>Sequencer</summary><div class="hb">
+    <ul><li>Click or tap squares to place hits. Drag across a row to paint.</li><li><b>Preview</b> plays the pattern. <b>Record my playing</b> layers what you play onto it. <b>Undo recording</b> removes the last pass.</li><li><b>Save &amp; practice</b> saves the pattern and opens it for practice. <b>Export MIDI</b> downloads it.</li></ul></div></details>
+  <details><summary>Mixer</summary><div class="hb">
+    <p>Set each drum's volume and the ring length of cymbals. 0% mutes a drum. <b>Ride sound</b> switches between the new Rock kit and the Classic ride. It changes this app's sounds, not your kit's own.</p></div></details>
+  <details><summary>Progress</summary><div class="hb">
+    <p>A run is saved when it finishes, or when you stop it after at least 8 scored notes. See bests, a chart over time and your history. <b>Export CSV</b> downloads it. Everything is stored in this browser only.</p></div></details>
+  <details><summary>Install and offline use</summary><div class="hb">
+    <p>Use your browser's <b>Install app</b> or <b>Add to Home screen</b> option. After the first visit the app opens without a connection.</p></div></details>
+  <details><summary>Troubleshooting</summary><div class="hb">
+    <ul><li><b>No pads detected:</b> check the cable, allow MIDI, reload, and use a browser that supports Web MIDI.</li><li><b>No sound:</b> tap the page once, check <b>Pad sounds</b> and the device volume.</li><li><b>Pad lights the wrong drum:</b> press <b>Learn</b> on that drum, then hit the pad.</li><li><b>Timing feels off:</b> run <b>Calibrate</b>.</li></ul></div></details>
+</div>
 
 <div class="controls">
   <label>View <select id="view"><option value="game">Game</option><option value="notation">Notation</option></select></label>
@@ -124,7 +161,7 @@ button:disabled{opacity:.45;cursor:default}
   <span>Practice drums</span><span id="laneChips" style="display:flex;gap:6px;flex-wrap:wrap"></span>
   <select id="lanePreset" aria-label="Drum presets"><option value="">Presets…</option><option value="all">All drums</option><option value="ks">Kick + snare</option><option value="kh">Kick + hi-hat</option><option value="hands">Hands only (no kick)</option><option value="cym">Cymbals only</option></select>
   <label style="display:flex;align-items:center;gap:6px" title="Keep playing the hidden drums' sound from the pattern so you hear the full groove (not in Wait for me mode)"><input type="checkbox" id="hearHidden"> Still hear hidden drums</label>
-  <span class="small" id="laneHint">Click a drum to hide it · Shift-click or hold to play just that one</span>
+  <span class="small" id="laneHint">Click to hide · Shift-click or hold to solo · keys 1–8 hide/show, Shift+1–8 solo, 0 shows all</span>
 </div>
 <div id="msg">Hit any pad (or use the keyboard) to test. Press Start or Space to begin.</div>
 
@@ -282,7 +319,7 @@ function clockNow(){ return frozen ? frozen.at : paused ? paused.at : performanc
 function hearHidden(){ return $('hearHidden').checked; }
 const laneOff = new Set();                                  // drums hidden from practice
 function laneSig(){ return LANES.filter(l => laneOff.has(l.id)).map(l => l.id).join(','); }
-function rangeStr(){ return $('barFrom').value+'|'+$('barTo').value+'|'+laneSig(); }
+function rangeStr(){ return $('barFrom').value+'|'+$('barTo').value; }
 function applyFlags(){
   loopOn = $('loop').checked;
   demoOn = $('demo').checked && !waitOn; metOn = $('metro').checked && !waitOn; backOn = $('backing').checked && !waitOn;
@@ -648,7 +685,7 @@ function start(){
   beatMs = 60000/ +$('bpm').value;
   barInt = Number.isInteger(cyc.barBeats) ? cyc.barBeats : 4;
   cycleBeats = cyc.cycleBeats; cycEvents = cyc.events; cycBack = cyc.back; cycGhost = cyc.ghost||[]; userPage = 0;
-  paused = null; waitOn = $('wait').checked; frozen = null; waitLanes = new Set(); applyFlags(); runStartReal = performance.now();
+  paused = null; laneMixed = false; waitOn = $('wait').checked; frozen = null; waitLanes = new Set(); applyFlags(); runStartReal = performance.now();
   countIn = $('countin').checked ? 4 : 0;
   notes = []; back = []; genCycles = 0; stats = freshStats(); popups.length = 0; fx.length = 0;
   startMs = performance.now() + countIn*beatMs + 400;
@@ -685,7 +722,7 @@ function pauseRun(){
   $('pause').textContent = 'Resume';
   renderLaneChips();
   if(viewMode!=='notation'){ viewMode = 'notation'; applyView(); }
-  setMsg('Paused. Click a bar (or drag across several) to choose the section to loop, or change the practice drums, then press Resume. If you change either, the new section starts from its first bar.');
+  setMsg('Paused. Click a bar (or drag across several) to choose the section to loop, then press Resume. If you change the bars, the new section starts from its first bar. Changing the practice drums does not restart.');
 }
 function resumeRun(){
   if(!paused) return;
@@ -868,15 +905,44 @@ const NPOS = {kick:1, snare:5, tom1:7, tom2:6, tom3:3, hihat:9, ride:8, crash:10
 const XHEAD = {hihat:1, ride:1, crash:1};
 const GRADE_COL = {1:'#4ade80', 2:'#bef264', 3:'#fbbf24', 4:'#f87171', 5:'#ffd166'};
 const INK = '#e7eaf0', STAFF = '#5b6478', DIM = '#8d96a8', STEM = '#cdd3df';
-function lanesLocked(){ return running && !paused; }
+function lanesLocked(){ return false; }
+// Change which drums are practiced without restarting: only notes still ahead of the playhead change.
+function applyLanesLive(){
+  if(!running || !curCycle) return;
+  const nb = Math.max(1, Math.round(curCycle.cycleBeats/curCycle.barBeats));
+  const cyc = buildCycle(curCycle.firstBar, curCycle.firstBar+nb-1);
+  const cb = (clockNow()-startMs)/beatMs;
+  const guard = cb + Math.max(0.3, 200/beatMs);
+  if(stats.perfect+stats.good+stats.okay+stats.miss>0) laneMixed = true;
+  curCycle = cyc; cycEvents = cyc.events; cycGhost = cyc.ghost||[];
+  notes = notes.filter(n => !(n.state===0 && laneOff.has(n.lane)));
+  const have = new Set(notes.map(n => n.lane+'|'+n.beat.toFixed(3)));
+  for(let c=0;c<genCycles;c++){
+    const base = c*cycleBeats;
+    for(const e of cyc.events){ const b = base+e.beat; if(b>=guard && !have.has(e.lane+'|'+b.toFixed(3))) notes.push({beat:b, lane:e.lane, vel:e.vel, open:e.open, state:0, sched:false}); }
+  }
+  const ahead = ((clockNow()-startMs)+150)/beatMs;
+  back = back.filter(n => !(n.drum && !n.sched));
+  for(let c=0;c<genCycles;c++){
+    const base = c*cycleBeats;
+    for(const g of cyc.ghost){ const b = base+g.beat; if(b>ahead) back.push({beat:b, drum:true, lane:g.lane, open:g.open, vel:g.vel, sched:false}); }
+  }
+  // wait mode: if the note we were waiting for is now hidden, let the song carry on
+  if(frozen && !notes.some(n => n.state===0 && Math.abs(n.beat-frozen.beat)<0.02)){
+    startMs += (paused ? paused.at : performance.now()) - frozen.at; frozen = null; waitLanes = new Set();
+  }
+}
+let laneMixed = false;
+function showAllLanes(){ laneOff.clear(); laneChanged(); }
 function renderLaneChips(){
   const box = $('laneChips'); box.innerHTML = '';
   $('lanebar').classList.toggle('locked', lanesLocked());
   for(const l of LANES){
     const b = document.createElement('button'); b.className = 'lchip'+(laneOff.has(l.id)?' off':''); b.type = 'button';
-    b.setAttribute('aria-pressed', laneOff.has(l.id) ? 'false' : 'true'); b.title = laneOff.has(l.id) ? 'Hidden. Click to show' : 'Click to hide. Shift-click or hold to play just this drum';
+    b.setAttribute('aria-pressed', laneOff.has(l.id) ? 'false' : 'true'); b.title = (laneOff.has(l.id) ? 'Hidden. Click to show' : 'Click to hide. Shift-click or hold to play just this drum') + ' (key '+(LANES.indexOf(l)+1)+')';
     const dot = document.createElement('span'); dot.className = 'dot'; dot.style.background = l.color;
-    b.append(dot, document.createTextNode(l.label));
+    const num = document.createElement('span'); num.textContent = String(LANES.indexOf(l)+1); num.style.cssText = 'opacity:.55;font-size:11px';
+    b.append(dot, document.createTextNode(l.label+' '), num);
     let timer = null, held = false;
     b.onpointerdown = () => { held = false; timer = setTimeout(() => { held = true; soloLane(l.id); }, 500); };
     const cancel = () => { clearTimeout(timer); };
@@ -886,18 +952,16 @@ function renderLaneChips(){
   }
 }
 function laneChanged(){
-  prevCache = null; renderLaneChips(); refreshBest();
+  prevCache = null; applyLanesLive(); renderLaneChips(); refreshBest();
   const hidden = laneOff.size;
-  setMsg(hidden ? 'Practicing '+LANES.filter(l=>!laneOff.has(l.id)).map(l=>l.label).join(' + ')+'. Hidden drums are not shown or scored.'+(paused ? ' Press Resume to restart with this selection.' : '') : 'Practicing all drums.');
+  setMsg(hidden ? 'Practicing '+LANES.filter(l=>!laneOff.has(l.id)).map(l=>l.label).join(' + ')+'. Hidden drums are not shown or scored.'+(running ? ' Applies from the next notes, without restarting.' : '') : 'Practicing all drums.');
 }
 function toggleLane(id){
-  if(lanesLocked()){ setMsg('Pause first to change which drums you practice.'); return; }
   if(laneOff.has(id)) laneOff.delete(id);
   else { if(LANES.filter(l => !laneOff.has(l.id)).length<=1){ setMsg('Keep at least one drum on.'); return; } laneOff.add(id); }
   laneChanged();
 }
 function soloLane(id){
-  if(lanesLocked()){ setMsg('Pause first to change which drums you practice.'); return; }
   const only = LANES.every(l => l.id===id ? !laneOff.has(id) : laneOff.has(l.id));
   laneOff.clear();
   if(!only) LANES.forEach(l => { if(l.id!==id) laneOff.add(l.id); });
@@ -907,7 +971,6 @@ const LANE_PRESETS = {all:null, ks:['kick','snare'], kh:['kick','hihat'], hands:
 $('lanePreset').onchange = e => {
   const k = e.target.value; e.target.value = ''; e.target.blur();
   if(!k) return;
-  if(lanesLocked()){ setMsg('Pause first to change which drums you practice.'); return; }
   const keep = LANE_PRESETS[k]; laneOff.clear();
   if(keep) LANES.forEach(l => { if(keep.indexOf(l.id)<0) laneOff.add(l.id); });
   laneChanged();
@@ -917,10 +980,10 @@ function nBarsOf(dc){ return Math.max(1, Math.round(dc.cycleBeats/dc.barBeats));
 let viewMode = 'game', userPage = 0, curCycle = null, prevCache = null, lastDcKey = '', lastPageLbl = '';
 const layCache = new WeakMap();
 
-function buildCycle(){
+function buildCycle(fixFrom, fixTo){
   const p = PATTERNS[+$('pattern').value], src = sourceOf(p);
-  let from = Math.max(1, parseInt($('barFrom').value)||1);
-  let to = Math.min(src.bars, parseInt($('barTo').value)||src.bars);
+  let from = Math.max(1, fixFrom || parseInt($('barFrom').value)||1);
+  let to = Math.min(src.bars, fixTo || parseInt($('barTo').value)||src.bars);
   from = Math.min(from, src.bars); if(to<from) to = from;
   const r0 = (from-1)*src.barBeats, cb = (to-from+1)*src.barBeats;
   return {
@@ -1324,7 +1387,7 @@ function recordRun(finished){
     t:Date.now(), song:pat.name, from:c.firstBar, to:c.firstBar+Math.max(1,Math.round(c.cycleBeats/c.barBeats))-1,
     bpm:+$('bpm').value, mode:waitOn?'wait':'play', acc:Math.round(acc*10)/10,
     perfect:stats.perfect, good:stats.good, okay:stats.okay, miss:stats.miss, extra:stats.extra, combo:stats.best,
-    drums:c.drumsOff||'', off:stats.offN ? Math.round(stats.offSum/stats.offN) : 0, secs:Math.round((performance.now()-runStartReal)/1000), done:!!finished
+    drums:laneMixed ? 'mixed' : (c.drumsOff||''), off:stats.offN ? Math.round(stats.offSum/stats.offN) : 0, secs:Math.round((performance.now()-runStartReal)/1000), done:!!finished
   };
   const prev = runLog.filter(r => r.mode==='play' && keyOf(r)===keyOf(run)).reduce((m,r) => Math.max(m,r.acc), -1);
   runLog.push(run); saveHistory();
@@ -1332,6 +1395,7 @@ function recordRun(finished){
 }
 function drumsLabel(r){
   if(!r.drums) return '';
+  if(r.drums==='mixed') return ' · drums changed mid-run';
   const off = r.drums.split(','), kept = LANES.filter(l => off.indexOf(l.id)<0).map(l => l.label);
   return ' · ' + (kept.length<=3 ? kept.join(' + ') : 'without '+LANES.filter(l => off.indexOf(l.id)>=0).map(l => l.label).join(', '));
 }
@@ -1755,6 +1819,14 @@ $('pgPrev').onclick = () => { if(!running || paused) userPage = Math.max(0, user
 $('pgNext').onclick = () => { if(!running || paused) userPage = userPage+1; };
 applyView();
 window.addEventListener('pointerup', () => { seqPaint = null; });
+function helpToggle(open){
+  const m = $('helpmenu'); const show = open===undefined ? m.hidden : open;
+  if(show){ const r = $('hbtn').getBoundingClientRect(); m.style.top = Math.round(r.bottom+8)+'px'; m.style.maxHeight = 'calc(100vh - '+Math.round(r.bottom+22)+'px)'; }
+  m.hidden = !show; $('hbtn').setAttribute('aria-expanded', String(show));
+}
+$('hbtn').onclick = e => { e.stopPropagation(); e.target.blur(); helpToggle(); };
+document.addEventListener('pointerdown', e => { if(!$('helpmenu').hidden && !$('helpmenu').contains(e.target) && e.target!==$('hbtn')) helpToggle(false); });
+window.addEventListener('keydown', e => { if(e.key==='Escape' && !$('helpmenu').hidden) helpToggle(false); });
 $('mbtn').onclick = () => { const m = $('mixer'); m.hidden = !m.hidden; if(!m.hidden){ renderMixer(); m.scrollIntoView({behavior:'smooth', block:'start'}); } };
 $('mxClose').onclick = () => { $('mixer').hidden = true; };
 $('mxReset').onclick = () => { mixVol = {}; mixRing = {}; rideKit = 'rock'; mixSave(); renderMixer(); };
@@ -1864,6 +1936,12 @@ window.addEventListener('keydown', e => {
   if(tg && (tg.tagName==='TEXTAREA' || (tg.tagName==='INPUT' && ['text','number','search'].indexOf(tg.type)>=0))) return;
   if(e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
   if(e.code==='Space' && seqRec){ e.preventDefault(); seqRecStop(); return; }
+  const dm = /^Digit([0-8])$/.exec(e.code);
+  if(dm && !seqRec){
+    e.preventDefault(); const n = +dm[1];
+    if(n===0) showAllLanes(); else { const l = LANES[n-1]; if(l){ if(e.shiftKey) soloLane(l.id); else toggleLane(l.id); } }
+    return;
+  }
   if(e.key.toLowerCase()==='p' && running){ e.preventDefault(); togglePause(); return; }
   if(e.code==='Space'){ e.preventDefault(); if(document.activeElement) document.activeElement.blur(); running ? stop(false) : start(); return; }
   const l = LANES.find(x=>x.key===e.key.toLowerCase());
