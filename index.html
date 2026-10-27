@@ -101,7 +101,7 @@ button:disabled{opacity:.45;cursor:default}
   <label>Pattern <select id="pattern"></select></label>
   <button id="imp" title="Load a Standard MIDI file (.mid). You can also drag a file onto the page.">Import MIDI…</button><input type="file" id="file" accept=".mid,.midi,audio/midi,audio/x-midi" hidden><button id="rmsong" hidden>Remove song</button>
   <label>Tempo <input type="range" id="bpm" min="20" max="250" value="80"><b id="bpmVal" style="color:var(--text);min-width:64px">80 BPM</b></label>
-  <label title="Practice just part of the song. Leave blank for the whole thing.">Bars <input type="number" id="barFrom" min="1" placeholder="1" style="width:60px"> to <input type="number" id="barTo" min="1" placeholder="end" style="width:60px"></label>
+  <label title="Practice just part of the song. Leave blank for the whole thing.">Bars <input type="number" id="barFrom" min="1" placeholder="1" style="width:60px"> to <input type="number" id="barTo" min="1" placeholder="end" style="width:60px"> <button id="barAll" title="Clear the bar range and use the whole song" style="padding:4px 8px">All</button></label>
   <label><input type="checkbox" id="countin" checked> Count-in</label>
   <label><input type="checkbox" id="metro" checked> Metronome</label>
   <label><input type="checkbox" id="demo"> Hear the drums</label>
@@ -111,6 +111,7 @@ button:disabled{opacity:.45;cursor:default}
   <label title="Play a drum sound from this device when you hit a pad. Turn off if your kit makes its own sound."><input type="checkbox" id="padsnd" checked> Pad sounds</label>
   <label>Latency offset <input type="number" id="offset" value="0" step="5"> ms</label>
   <button id="calib">Calibrate</button>
+  <button id="pause" hidden title="Freeze the song so you can pick bars to loop (shortcut: P)">Pause</button>
   <button id="go" class="primary">Start</button>
 </div>
 <div id="msg">Hit any pad (or use the keyboard) to test. Press Start or Space to begin.</div>
@@ -264,7 +265,9 @@ LANES.forEach(l => { vels[l.id] = []; });
 function freshStats(){ return {perfect:0,good:0,okay:0,miss:0,extra:0,combo:0,best:0,offSum:0,offN:0,waits:0}; }
 // Wait mode: the song clock freezes at a note until you hit it. frozen = {beat, at} while waiting.
 let frozen = null, waitOn = false, waitLanes = new Set();
-function clockNow(){ return frozen ? frozen.at : performance.now(); }
+let paused = null, pausedRange = '', jumpToBar = -1;      // paused = {at, bar} while the run is on hold
+function clockNow(){ return frozen ? frozen.at : paused ? paused.at : performance.now(); }
+function rangeStr(){ return $('barFrom').value+'|'+$('barTo').value; }
 function applyFlags(){
   loopOn = $('loop').checked;
   demoOn = $('demo').checked && !waitOn; metOn = $('metro').checked && !waitOn; backOn = $('backing').checked && !waitOn;
@@ -629,21 +632,21 @@ function start(){
   beatMs = 60000/ +$('bpm').value;
   barInt = Number.isInteger(cyc.barBeats) ? cyc.barBeats : 4;
   cycleBeats = cyc.cycleBeats; cycEvents = cyc.events; cycBack = cyc.back; userPage = 0;
-  waitOn = $('wait').checked; frozen = null; waitLanes = new Set(); applyFlags(); runStartReal = performance.now();
+  paused = null; waitOn = $('wait').checked; frozen = null; waitLanes = new Set(); applyFlags(); runStartReal = performance.now();
   countIn = $('countin').checked ? 4 : 0;
   notes = []; back = []; genCycles = 0; stats = freshStats(); popups.length = 0; fx.length = 0;
   startMs = performance.now() + countIn*beatMs + 400;
   nextClickBeat = -countIn;
   running = true;
   setLocked(true);
-  $('go').textContent='Stop'; $('go').classList.add('stop');
+  $('go').textContent='Stop'; $('go').classList.add('stop'); $('pause').hidden = false; $('pause').textContent = 'Pause';
   setMsg(waitOn ? 'Wait mode: the song pauses at each note until you hit it. Backing, metronome and demo sound are off.' : 'Play along. Blocks reach the line at the exact moment to hit.');
   $('waitRow').hidden = !waitOn;
   schedTimer = setInterval(schedule, 25); schedule();
 }
 function stop(finished){
   const wasRunning = running;
-  frozen = null;
+  frozen = null; paused = null; $('pause').hidden = true; barPending = null;
   running = false; clearInterval(schedTimer);
   setLocked(false);
   $('go').textContent='Start'; $('go').classList.remove('stop');
@@ -656,6 +659,26 @@ function stop(finished){
   if(rec){ m += rec.newBest ? ' New personal best for this song!' : rec.first ? ' First scored run saved for this song.' : ' Run saved.'; refreshBest(); if(!$('progress').hidden) renderProgress(); }
   setMsg(m);
 }
+function pauseRun(){
+  if(!running || paused || calib) return;
+  const cb = (clockNow()-startMs)/beatMs;
+  let bar = -1;
+  if(cb>=0 && curCycle){ const pos = ((cb % cycleBeats)+cycleBeats) % cycleBeats; bar = curCycle.firstBar-1 + Math.floor(pos/curCycle.barBeats); }
+  paused = {at: performance.now(), bar}; jumpToBar = bar; pausedRange = rangeStr(); barPending = null;
+  $('barFrom').disabled = false; $('barTo').disabled = false;
+  $('pause').textContent = 'Resume';
+  if(viewMode!=='notation'){ viewMode = 'notation'; applyView(); }
+  setMsg('Paused. Click a bar (or drag across several) to choose the section to loop, then press Resume. If you change the bars, the new section starts from its first bar.');
+}
+function resumeRun(){
+  if(!paused) return;
+  if(rangeStr()!==pausedRange){ stop(false); start(); return; }   // new section: save this run and restart on the new bars
+  const d = performance.now()-paused.at;
+  startMs += d; if(frozen) frozen.at += d;
+  paused = null; setLocked(true); $('pause').textContent = 'Pause';
+  setMsg('Playing again.');
+}
+function togglePause(){ if(paused) resumeRun(); else pauseRun(); }
 function schedule(){
   if(!running) return;
   const aheadBeat = ((clockNow()-startMs)+150)/beatMs;
@@ -692,7 +715,7 @@ function processHit(lane, vel, ts, open){
   const v = vels[lane]; v.push(vel); if(v.length>8) v.shift();
   if(seqRec) seqRecordHit(lane, ts, open);
   if(calib){ calibHit(ts); return; }
-  if(!running) return;
+  if(!running || paused) return;
   const hb = frozen ? frozen.beat : ((ts-offset)-startMs)/beatMs;
   if(hb < -0.6) return;
   let best=null, bestD=1e9;
@@ -826,6 +849,8 @@ const NPOS = {kick:1, snare:5, tom1:7, tom2:6, tom3:3, hihat:9, ride:8, crash:10
 const XHEAD = {hihat:1, ride:1, crash:1};
 const GRADE_COL = {1:'#4ade80', 2:'#bef264', 3:'#fbbf24', 4:'#f87171', 5:'#ffd166'};
 const INK = '#e7eaf0', STAFF = '#5b6478', DIM = '#8d96a8', STEM = '#cdd3df';
+const barHits = []; let barPending = null, barDrag = false;
+function nBarsOf(dc){ return Math.max(1, Math.round(dc.cycleBeats/dc.barBeats)); }
 let viewMode = 'game', userPage = 0, curCycle = null, prevCache = null, lastDcKey = '', lastPageLbl = '';
 const layCache = new WeakMap();
 
@@ -840,6 +865,15 @@ function buildCycle(){
     events: src.events.filter(e => e.beat>=r0-1e-6 && e.beat<r0+cb-1e-6).map(e => ({beat:e.beat-r0, lane:e.lane, vel:e.vel, open:!!e.open})),
     back: src.backing.filter(b => b.beat>=r0-1e-6 && b.beat<r0+cb-1e-6).map(b => ({beat:b.beat-r0, dur:Math.min(b.dur, r0+cb-b.beat), note:b.note, vel:b.vel, prog:b.prog}))
   };
+}
+let fullCache = null;
+function fullCycle(){
+  const p = PATTERNS[+$('pattern').value], src = sourceOf(p);
+  if(!fullCache || fullCache.src!==src){
+    fullCache = {key:'full|'+$('pattern').value+'|'+PATTERNS.length, p, src, firstBar:1, barBeats:src.barBeats, cycleBeats:src.bars*src.barBeats,
+      events: src.events.map(e => ({beat:e.beat, lane:e.lane, vel:e.vel, open:!!e.open})), back:[]};
+  }
+  return fullCache;
 }
 function previewCycle(){
   const key = $('pattern').value+'|'+$('barFrom').value+'|'+$('barTo').value+'|'+PATTERNS.length;
@@ -991,7 +1025,11 @@ function drawBarNotation(beats, bx, bw, topLine, sp, barBeats, y0, stateOf){
 
 function drawNotation(now, curBeat){
   const W = cw, H = ch;
-  const dc = running && curCycle ? curCycle : previewCycle();
+  const pick = !running || !!paused;               // choosing bars: show the whole song
+  const dc = !pick && curCycle ? curCycle : fullCycle();
+  barHits.length = 0;
+  let selFrom = 0, selTo = 0;
+  if(pick){ const bf = parseInt($('barFrom').value)||0, bt = parseInt($('barTo').value)||0; if(bf||bt){ selFrom = Math.max(1, bf||1); selTo = Math.min(nBarsOf(dc), bt||nBarsOf(dc)); if(selTo<selFrom) selTo = selFrom; } }
   const nBars = Math.max(1, Math.round(dc.cycleBeats/dc.barBeats));
   const sp = Math.max(8, Math.min(11, W/95));
   const left = 14, gutter = 56, usable = W-left-14-gutter;
@@ -1002,7 +1040,7 @@ function drawNotation(now, curBeat){
 
   // where are we in the cycle?
   let base = 0, pos = -1, ci = null;
-  if(running && curBeat>=0){
+  if(running && !paused && curBeat>=0){
     ci = loopOn ? Math.floor(curBeat/dc.cycleBeats) : 0;
     base = ci*dc.cycleBeats;
     pos = Math.min(curBeat-base, dc.cycleBeats-1e-6);
@@ -1011,6 +1049,7 @@ function drawNotation(now, curBeat){
   if(!running && key!==lastDcKey){ userPage = 0; }
   lastDcKey = key;
   if(pos>=0) userPage = Math.floor(Math.floor(pos/dc.barBeats)/perPage);
+  if(pick && jumpToBar>=0){ userPage = Math.floor(jumpToBar/perPage); jumpToBar = -1; }
   userPage = Math.max(0, Math.min(userPage, pages-1));
   const page = userPage;
   const lbl = 'Page '+(page+1)+' of '+pages;
@@ -1048,6 +1087,16 @@ function drawNotation(now, curBeat){
       g2.strokeStyle = STAFF; g2.lineWidth = 1.4; g2.beginPath(); g2.moveTo(bx, topLine); g2.lineTo(bx, botLine); g2.stroke();
       g2.fillStyle = DIM; g2.font = '600 10px system-ui,sans-serif'; g2.textAlign = 'left'; g2.fillText(String(dc.firstBar+bi), bx+3, y0+9);
       drawBarNotation(lay[bi], bx, bw, topLine, sp, dc.barBeats, y0, stateOf);
+      if(pick){
+        const bn = dc.firstBar+bi, by = y0+4, bh = botLine+3.2*sp-y0-4;
+        barHits.push({x:bx, y:by, w:bw, h:bh, bar:bn});
+        if(selFrom){
+          if(bn>=selFrom && bn<=selTo){ g2.fillStyle = 'rgba(255,209,102,0.12)'; g2.fillRect(bx, by, bw, bh); g2.fillStyle = '#ffd166'; g2.fillRect(bx, by, bw, 3); }
+          else { g2.fillStyle = 'rgba(14,16,22,0.55)'; g2.fillRect(bx, by, bw, bh); }
+        }
+        if(paused && paused.bar===bn-1){ g2.strokeStyle = '#4cc9f0'; g2.lineWidth = 2; g2.setLineDash([5,4]); g2.strokeRect(bx+1, by+1, bw-2, bh-2); g2.setLineDash([]); }
+        if(barPending===bn){ g2.strokeStyle = '#ffd166'; g2.lineWidth = 2; g2.strokeRect(bx+1, by+1, bw-2, bh-2); }
+      }
     }
     g2.strokeStyle = STAFF; g2.lineWidth = 1.4; g2.beginPath(); g2.moveTo(x1, topLine); g2.lineTo(x1, botLine); g2.stroke();
     if(first+r*perRow+inRow>=nBars){ g2.fillStyle = INK; g2.fillRect(x1-3.5, topLine, 3.5, 4*sp); }
@@ -1074,8 +1123,10 @@ function drawNotation(now, curBeat){
     if(n>=1 && n<=countIn){ g2.fillStyle = 'rgba(255,255,255,.8)'; g2.font = '700 64px system-ui,sans-serif'; g2.fillText(String(n), W-24, 70); }
   } else if(frozen){
     g2.fillStyle = '#ffd166'; g2.font = '700 15px system-ui,sans-serif'; g2.fillText('Waiting for you…', W-18, 20);
+  } else if(paused){
+    g2.fillStyle = '#ffd166'; g2.font = '700 15px system-ui,sans-serif'; g2.fillText('Paused · click bars to pick a loop, then Resume', W-18, 20);
   } else if(!running){
-    g2.fillStyle = DIM; g2.font = '13px system-ui,sans-serif'; g2.fillText(calib ? 'Calibrating… tap on the clicks' : 'Press Start or Space', W-18, 18);
+    g2.fillStyle = DIM; g2.font = '13px system-ui,sans-serif'; g2.fillText(calib ? 'Calibrating… tap on the clicks' : (barPending ? 'Now click the last bar' : 'Click a bar to start a loop (drag to pick several) · Press Start or Space'), W-18, 18);
   }
   g2.textAlign = 'center';
 }
@@ -1178,10 +1229,10 @@ let frameN = 0;
 function frame(){
   const now = performance.now();
   let curBeat = running ? (clockNow()-startMs)/beatMs : 0;
-  if(running && waitOn && !frozen && curBeat>=0 && checkFreeze(curBeat)) curBeat = frozen.beat;
+  if(running && !paused && waitOn && !frozen && curBeat>=0 && checkFreeze(curBeat)) curBeat = frozen.beat;
   if(running){
-    if(!waitOn) sweep(now);
-    if(!loopOn && genCycles>=1 && curBeat>cycleBeats+0.3 && notes.every(n=>n.state!==0)) stop(true);
+    if(!waitOn && !paused) sweep(now);
+    if(!paused && !loopOn && genCycles>=1 && curBeat>cycleBeats+0.3 && notes.every(n=>n.state!==0)) stop(true);
     if(loopOn && ++frameN%300===0) { notes = notes.filter(n=>n.beat>curBeat-8 || n.state===0); back = back.filter(n=>!n.sched); }
   }
   draw(now, curBeat);
@@ -1630,8 +1681,8 @@ $('offset').onchange = e => { offset = +e.target.value||0; save(); };
 $('pattern').onchange = e => { e.target.blur(); onPatternChange(); };
 function applyView(){ $('view').value = viewMode; $('pager').hidden = viewMode!=='notation'; $('pager').style.display = viewMode==='notation' ? 'flex' : 'none'; }
 $('view').onchange = e => { viewMode = e.target.value; e.target.blur(); applyView(); save(); };
-$('pgPrev').onclick = () => { if(!running) userPage = Math.max(0, userPage-1); };
-$('pgNext').onclick = () => { if(!running) userPage = userPage+1; };
+$('pgPrev').onclick = () => { if(!running || paused) userPage = Math.max(0, userPage-1); };
+$('pgNext').onclick = () => { if(!running || paused) userPage = userPage+1; };
 applyView();
 window.addEventListener('pointerup', () => { seqPaint = null; });
 $('mbtn').onclick = () => { const m = $('mixer'); m.hidden = !m.hidden; if(!m.hidden){ renderMixer(); m.scrollIntoView({behavior:'smooth', block:'start'}); } };
@@ -1706,6 +1757,32 @@ window.addEventListener('dragover', e => e.preventDefault());
 window.addEventListener('drop', e => { e.preventDefault(); const f = e.dataTransfer && e.dataTransfer.files[0]; if(f) importFile(f); });
 onPatternChange();
 $('go').onclick = () => running ? stop(false) : start();
+$('pause').onclick = e => { e.target.blur(); togglePause(); };
+function setBarRange(a, b){
+  const n = nBarsOf(fullCycle()), lo = Math.max(1, Math.min(a,b)), hi = Math.min(n, Math.max(a,b));
+  if(lo<=1 && hi>=n){ $('barFrom').value = ''; $('barTo').value = ''; }
+  else { $('barFrom').value = lo; $('barTo').value = hi; }
+  refreshBest();
+}
+$('barAll').onclick = e => { e.target.blur(); barPending = null; $('barFrom').value = ''; $('barTo').value = ''; refreshBest(); };
+function barAt(ev){
+  const r = cv.getBoundingClientRect(), x = ev.clientX-r.left, y = ev.clientY-r.top;
+  for(const h of barHits) if(x>=h.x && x<h.x+h.w && y>=h.y && y<h.y+h.h) return h.bar;
+  return null;
+}
+cv.addEventListener('pointerdown', ev => {
+  if(viewMode!=='notation' || (running && !paused) || calib) return;
+  const b = barAt(ev); if(b===null) return;
+  if(barPending!==null){ setBarRange(barPending, b); barPending = null; barDrag = false; }
+  else { setBarRange(b, b); barPending = b; barDrag = true; }
+  setMsg(barPending ? 'Bar '+b+' chosen. Click the last bar of the section (or the same bar again for just one bar).' : 'Loop set to ' + ($('barFrom').value ? 'bars '+$('barFrom').value+(($('barTo').value && $('barTo').value!==$('barFrom').value) ? '–'+$('barTo').value : '') : 'the whole song') + '. ' + (paused ? 'Press Resume.' : 'Press Start.'));
+});
+cv.addEventListener('pointermove', ev => {
+  if(viewMode!=='notation' || (running && !paused) || calib){ cv.style.cursor = ''; return; }
+  const b = barAt(ev); cv.style.cursor = b===null ? '' : 'pointer';
+  if(barDrag && barPending!==null && b!==null && b!==barPending){ setBarRange(barPending, b); barPending = null; barDrag = false; }
+});
+window.addEventListener('pointerup', () => { barDrag = false; });
 $('calib').onclick = calibrate;
 $('resetMap').onclick = () => { noteMap = defaultMap(); learnLane=null; save(); renderChips(); };
 ['countin','metro','demo','loop','backing'].forEach(id => $(id).onchange = e => {
@@ -1717,6 +1794,7 @@ window.addEventListener('keydown', e => {
   if(tg && (tg.tagName==='TEXTAREA' || (tg.tagName==='INPUT' && ['text','number','search'].indexOf(tg.type)>=0))) return;
   if(e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
   if(e.code==='Space' && seqRec){ e.preventDefault(); seqRecStop(); return; }
+  if(e.key.toLowerCase()==='p' && running){ e.preventDefault(); togglePause(); return; }
   if(e.code==='Space'){ e.preventDefault(); if(document.activeElement) document.activeElement.blur(); running ? stop(false) : start(); return; }
   const l = LANES.find(x=>x.key===e.key.toLowerCase());
   if(l){ initAudio(); processHit(l.id, 100, performance.now(), false); }
